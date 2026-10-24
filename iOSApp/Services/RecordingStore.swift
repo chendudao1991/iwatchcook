@@ -54,8 +54,14 @@ final class RecordingStore: ObservableObject {
         guard audio.length > 0 else { throw SpeechFailure.emptyAudio }
         let value = Recording(metadata: metadata)
         let target = audioURL(value)
-        if !FileManager.default.fileExists(atPath: target.path) {
-            try FileManager.default.copyItem(at: staged, to: target)
+        // A target without an index entry may be an orphan from an interrupted import.
+        // Never reuse it merely because it exists. Both URLs are in this app's data volume.
+        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                                              ofItemAtPath: staged.path)
+        if FileManager.default.fileExists(atPath: target.path) {
+            _ = try FileManager.default.replaceItemAt(target, withItemAt: staged)
+        } else {
+            try FileManager.default.moveItem(at: staged, to: target)
         }
         var candidate = recordings
         candidate.insert(value, at: 0)
