@@ -28,7 +28,9 @@ private final class RecognitionJob {
     func run(recognizer: SFSpeechRecognizer, request: SFSpeechRecognitionRequest) async throws -> String {
         try await withTaskCancellationHandler(operation: {
             try Task.checkCancellation()
+            guard !finished else { throw CancellationError() }
             return try await withCheckedThrowingContinuation { continuation in
+                guard !finished else { continuation.resume(throwing: CancellationError()); return }
                 self.continuation = continuation
                 self.recognizer = recognizer
                 task = recognizer.recognitionTask(with: request) { [weak self] result, error in

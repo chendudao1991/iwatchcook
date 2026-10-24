@@ -16,7 +16,7 @@ def counts(result):
     return total, total - failed - skipped, failed, skipped
 
 
-def validate(result, minimum=9):
+def validate(result, minimum=10):
     total, passed, failed, skipped = counts(result)
     if passed < minimum or failed or min(total, passed, failed, skipped) < 0:
         raise ValueError(f"Insufficient XCTest result: total={total}, passed={passed}, failed={failed}, skipped={skipped}")

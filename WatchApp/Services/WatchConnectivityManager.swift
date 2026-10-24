@@ -15,6 +15,8 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
     private var ready = false
     private var inFlight = false
     private var epoch = UUID()
+    private var retryBackoff = LiveRetryBackoff()
+    private var retryTimer: Timer?
 
     init(library: WatchLibrary) {
         self.library = library
@@ -48,7 +50,10 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         resumeLive()
     }
 
-    func resumeLive() {
+    func resumeLive(resetBackoff: Bool = true) {
+        retryTimer?.invalidate()
+        retryTimer = nil
+        if resetBackoff { retryBackoff.reset() }
         guard let id = liveID else { return }
         epoch = UUID()
         inFlight = false
@@ -64,6 +69,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         transmit(LivePacket(kind: .start, recordingID: id, sequence: sequence, streamID: token), token: token) { [weak self] ok in
             self?.ready = ok
             self?.liveStatus = ok ? "实时字幕已连接" : "实时不可用；本地录音继续，可重连"
+            if !ok { self?.scheduleRetry() }
         }
     }
 
@@ -72,6 +78,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         guard !inFlight else {
             ready = false
             liveStatus = "实时链路拥塞；本地录音继续，可重连"
+            scheduleRetry()
             return
         }
         sequence += 1
@@ -79,11 +86,18 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         transmit(LivePacket(kind: .audio, recordingID: id, sequence: sequence, pcm: bytes, streamID: epoch), token: epoch) { [weak self] ok in
             guard let self else { return }
             self.inFlight = false
-            if !ok { self.ready = false; self.liveStatus = "实时发送失败；本地录音继续" }
+            if ok { self.retryBackoff.reset() }
+            else {
+                self.ready = false
+                self.liveStatus = "实时发送失败；本地录音继续"
+                self.scheduleRetry()
+            }
         }
     }
 
     func endLive() {
+        retryTimer?.invalidate()
+        retryTimer = nil
         if let id = liveID, reachable {
             transmit(LivePacket(kind: .stop, recordingID: id, sequence: sequence, streamID: epoch), token: epoch) { _ in }
         }
@@ -91,6 +105,22 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         liveID = nil
         ready = false
         inFlight = false
+    }
+
+    private func scheduleRetry() {
+        guard let id = liveID, reachable, retryTimer == nil else { return }
+        guard let delay = retryBackoff.nextDelay() else {
+            liveStatus = "自动重连已暂停；本地录音继续，可手动重连"
+            return
+        }
+        liveStatus += "；\(Int(delay)) 秒后重连"
+        retryTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.liveID == id else { return }
+                self.retryTimer = nil
+                self.resumeLive(resetBackoff: false)
+            }
+        }
     }
 
     private func transmit(_ packet: LivePacket, token: UUID, completion: @escaping (Bool) -> Void) {
@@ -119,6 +149,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
             if packet.kind == .unavailable {
                 self.ready = false
                 self.liveStatus = packet.text ?? "实时不可用，本地录音继续"
+                self.scheduleRetry()
             }
         }
     }

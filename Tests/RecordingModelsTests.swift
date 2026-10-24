@@ -87,4 +87,13 @@ final class RecordingModelsTests: XCTestCase {
         let packet = LivePacket(kind: .subtitle, recordingID: id, sequence: 11, text: "新字幕", streamID: newStream)
         XCTAssertEqual(LivePacket.decode(try packet.encoded())?.streamID, newStream)
     }
+
+    func testLiveRetryBudgetIsBoundedAndCanRecover() {
+        var backoff = LiveRetryBackoff()
+        XCTAssertEqual((0..<6).compactMap { _ in backoff.nextDelay() }, [1, 2, 4, 8, 16, 30])
+        XCTAssertNil(backoff.nextDelay())
+        XCTAssertNil(backoff.nextDelay())
+        backoff.reset()
+        XCTAssertEqual(backoff.nextDelay(), 1)
+    }
 }

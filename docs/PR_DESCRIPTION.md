@@ -6,10 +6,11 @@ Keep local recording independent of live connectivity. Default to on-device Spee
 
 ## Validation
 
-- Linux Swift 6.0.3: 5 XCTest tests passed, 0 failures.
-- Swift compiler parsing, 16-file syntax-tree and manifest checks, shell syntax and whitespace checks passed.
-- Apple SDK type checking, XcodeGen execution, native builds, simulator and physical-device checks **not run**: this environment is Linux without Xcode or Apple SDKs.
+- Linux Swift 6.0.3: 10 XCTest tests passed, 0 failures. Four xcresult-validator tests passed.
+- Swift compiler parsing, 19-file syntax-tree and manifest checks, shell syntax and whitespace checks passed.
+- Remote macOS run 40102547763 for feebae8: original logs confirm XcodeGen execution, iOS and watchOS simulator BUILD SUCCEEDED, and iOS simulator XCTest: 9 passed / 0 failed / 0 skipped. Subsequent changes require their own CI results.
+- This local machine remains Linux. Physical-device tests, signing, sustained background recording and Speech accuracy **not verified**.
 
 ## Review focus
 
-This should remain a draft until macOS builds and paired-device acceptance pass. Validate Watch background recording, modern watchOS target embedding/signing, interrupted CAF recovery, WC transfer behaviour, Speech model availability and long-session energy/storage usage. Segment boundaries and live-window rotations may lose provisional words; only final file transcription is authoritative. PDF/Word export, pause/resume, iCloud and summaries remain out of scope.
+This should remain a draft until paired-device acceptance passes. Validate Watch background recording, signing, interrupted CAF recovery, WC transfer behaviour, Speech model availability and long-session energy/storage usage. The phone publishes checkpoints only after atomic persistence succeeds. Reconnected live streams have distinct IDs; retries back off with a finite budget. Segment boundaries and live-window rotations may lose provisional words; only final file transcription is authoritative. PDF/Word export, pause/resume, iCloud and summaries remain out of scope.

@@ -112,7 +112,10 @@ final class WatchRecordingService: ObservableObject {
                         Task { @MainActor in self?.receivePCM(bytes, id: metadata.id) }
                     }
                 } catch {
-                    Task { @MainActor in self?.stop(reason: "录音写入失败：\(error.localizedDescription)") }
+                    Task { @MainActor in
+                        guard self?.metadata?.id == metadata.id else { return }
+                        self?.stop(reason: "录音写入失败：\(error.localizedDescription)")
+                    }
                 }
             }
             engine.prepare()
