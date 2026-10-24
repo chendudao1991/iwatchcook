@@ -67,6 +67,7 @@ struct LivePacket: Codable {
     let sequence: Int
     var pcm: Data?
     var text: String?
+    var streamID: UUID? = nil
 
     static let sampleRate: Double = 16_000
     static let maxAudioBytes = 32_000  // One second, mono signed Int16 PCM.
@@ -89,15 +90,18 @@ enum SegmentPlan {
 
 struct LiveSequenceGate {
     private(set) var recordingID: UUID?
+    private(set) var streamID: UUID?
     private(set) var lastSequence = 0
-    mutating func begin(_ id: UUID, sequence: Int) {
+    mutating func begin(_ id: UUID, sequence: Int, streamID: UUID? = nil) {
         recordingID = id
+        self.streamID = streamID
         lastSequence = sequence
     }
-    mutating func accept(_ id: UUID, sequence: Int) -> Bool {
-        guard recordingID == id, sequence == lastSequence + 1 else { return false }
+    mutating func accept(_ id: UUID, sequence: Int, streamID: UUID? = nil) -> Bool {
+        guard recordingID == id, self.streamID == streamID,
+              lastSequence < Int.max, sequence == lastSequence + 1 else { return false }
         lastSequence = sequence
         return true
     }
-    mutating func end() { recordingID = nil }
+    mutating func end() { recordingID = nil; streamID = nil }
 }

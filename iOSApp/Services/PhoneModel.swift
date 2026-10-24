@@ -14,6 +14,7 @@ final class PhoneModel: ObservableObject {
             speech.allowOnline = allowOnline
             if let currentID, !queue.contains(currentID) { queue.insert(currentID, at: 0) }
             worker?.cancel()
+            speech.cancelActiveRecognition()
             live.stop()
         }
     }
@@ -41,10 +42,19 @@ final class PhoneModel: ObservableObject {
             case .start:
                 if let currentID = self.currentID, !self.queue.contains(currentID) { self.queue.insert(currentID, at: 0) }
                 self.worker?.cancel()
-                try self.live.start(packet)
-            case .audio: try self.live.append(packet)
+                self.speech.cancelActiveRecognition()
+                do { try self.live.start(packet) }
+                catch { self.drain(); throw error }
+            case .audio:
+                do { try self.live.append(packet) }
+                catch {
+                    if self.live.recordingID == packet.recordingID, self.live.streamID == packet.streamID {
+                        self.live.stop()
+                    }
+                    throw error
+                }
             case .stop:
-                if self.live.recordingID == packet.recordingID { self.live.stop() }
+                if self.live.recordingID == packet.recordingID, self.live.streamID == packet.streamID { self.live.stop() }
             default: throw SpeechFailure.unavailable
             }
         }
@@ -58,14 +68,22 @@ final class PhoneModel: ObservableObject {
             consent = true
             UserDefaults.standard.set(true, forKey: "speechConsent")
             for record in store.recordings where record.state != .completed { enqueue(record.id) }
-        } else { notice = "语音识别权限被拒绝。原音频仍可播放和导出。" }
+        } else {
+            consent = false
+            UserDefaults.standard.set(false, forKey: "speechConsent")
+            worker?.cancel()
+            speech.cancelActiveRecognition()
+            live.stop()
+            notice = "语音识别权限被拒绝。原音频仍可播放和导出。"
+        }
     }
 
     func enqueue(_ id: UUID, restart: Bool = false) {
         guard store.recording(id) != nil else { return }
         if restart {
             guard currentID != id else { return }
-            store.update(id) { $0.segments = []; $0.state = .waiting; $0.error = nil }
+            do { try store.update(id) { $0.segments = []; $0.state = .waiting; $0.error = nil } }
+            catch { notice = "无法保存重试状态：\(error.localizedDescription)"; return }
         }
         if currentID != id && !queue.contains(id) { queue.append(id) }
         drain()
@@ -78,18 +96,21 @@ final class PhoneModel: ObservableObject {
         currentID = id
         worker = Task { [weak self] in
             guard let self else { return }
-            self.store.update(id) { $0.state = .transcribing; $0.error = nil }
             do {
+                try self.store.update(id) { $0.state = .transcribing; $0.error = nil }
                 let text = try await self.speech.transcribe(url: self.store.audioURL(recording),
                                                           completed: recording.segments) { [weak self] segments in
-                    self?.store.update(id) { $0.segments = segments }
+                    try self?.store.update(id) { $0.segments = segments }
                 }
                 try Task.checkCancellation()
-                self.store.update(id) { $0.transcript = text; $0.state = .completed; $0.error = nil }
+                try self.store.update(id) { $0.transcript = text; $0.state = .completed; $0.error = nil }
             } catch is CancellationError {
-                self.store.update(id) { $0.state = .waiting }
+                do { try self.store.update(id) { $0.state = .waiting } }
+                catch { self.notice = "保存中断状态失败：\(error.localizedDescription)" }
             } catch {
-                self.store.update(id) { $0.state = .failed; $0.error = error.localizedDescription }
+                let failure = error.localizedDescription
+                do { try self.store.update(id) { $0.state = .failed; $0.error = failure } }
+                catch { self.notice = "转写未完成：\(failure)。状态保存也失败：\(error.localizedDescription)" }
             }
             self.worker = nil
             self.currentID = nil
@@ -99,7 +120,7 @@ final class PhoneModel: ObservableObject {
 
     func delete(_ id: UUID) {
         queue.removeAll { $0 == id }
-        if currentID == id { worker?.cancel() }
+        if currentID == id { worker?.cancel(); speech.cancelActiveRecognition() }
         do { try store.delete(id) } catch { notice = error.localizedDescription }
     }
 }

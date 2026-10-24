@@ -57,11 +57,17 @@ private final class RecognitionJob {
         recognizer = nil
         pending?.resume(with: result)
     }
+
+    func cancel() { finish(.failure(CancellationError())) }
 }
 
 @MainActor
 final class SpeechTranscriptionService {
     var allowOnline = false
+    private var activeJob: RecognitionJob?
+
+    // Synchronous on MainActor: release the file recognition request before opening a live request.
+    func cancelActiveRecognition() { activeJob?.cancel() }
 
     func recognizer() throws -> SFSpeechRecognizer {
         guard SFSpeechRecognizer.authorizationStatus() == .authorized else { throw SpeechFailure.permission }
@@ -77,7 +83,7 @@ final class SpeechTranscriptionService {
         }
     }
 
-    func transcribe(url: URL, completed: [String], checkpoint: @escaping ([String]) -> Void) async throws -> String {
+    func transcribe(url: URL, completed: [String], checkpoint: @escaping ([String]) throws -> Void) async throws -> String {
         let recognizer = try recognizer()
         let asset = AVURLAsset(url: url)
         let duration = try await asset.load(.duration).seconds
@@ -93,10 +99,13 @@ final class SpeechTranscriptionService {
                 request.requiresOnDeviceRecognition = !allowOnline
                 request.shouldReportPartialResults = false
                 request.taskHint = .dictation
-                let text = try await RecognitionJob().run(recognizer: recognizer, request: request)
+                let job = RecognitionJob()
+                activeJob = job
+                defer { activeJob = nil }
+                let text = try await job.run(recognizer: recognizer, request: request)
                 try Task.checkCancellation()
                 segments.append(text)
-                checkpoint(segments)
+                try checkpoint(segments)
             }
         }
         return segments.joined(separator: "\n")

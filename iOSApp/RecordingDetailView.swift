@@ -46,7 +46,9 @@ struct RecordingDetailView: View {
                         }
                         if let failure = record.error { Text(failure).foregroundStyle(.orange) }
                         if record.state != .transcribing {
-                            Button("继续／重试转写") { model.enqueue(id) }.disabled(!model.consent)
+                            if record.state != .completed {
+                                Button("继续／重试转写") { model.enqueue(id) }.disabled(!model.consent)
+                            }
                             Button("从头重新转写") { showRestart = true }.disabled(!model.consent)
                         } else {
                             ProgressView("已完成 \(record.segments.count) 段，每段最多 40 秒")
@@ -57,8 +59,10 @@ struct RecordingDetailView: View {
                             .frame(minHeight: 240)
                             .disabled(record.state == .transcribing)
                         Button("保存标题与文字") {
-                            store.update(id) { $0.title = title; $0.transcript = draft }
-                            dirty = false
+                            do {
+                                try store.update(id) { $0.title = title; $0.transcript = draft }
+                                dirty = false
+                            } catch { self.error = "更改尚未保存：\(error.localizedDescription)" }
                         }.disabled(record.state == .transcribing)
                         Button("导出 TXT") { showExport = true }
                         ShareLink("分享文字", item: draft)

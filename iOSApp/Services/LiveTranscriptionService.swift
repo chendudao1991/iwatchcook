@@ -15,6 +15,7 @@ final class LiveTranscriptionService {
     private var watchdog: Timer?
     private var gate = LiveSequenceGate()
     var recordingID: UUID? { gate.recordingID }
+    var streamID: UUID? { gate.streamID }
     private var lastSequence: Int { gate.lastSequence }
     var onSubtitle: ((LivePacket) -> Void)?
     var onEnd: (() -> Void)?
@@ -22,12 +23,17 @@ final class LiveTranscriptionService {
     init(speech: SpeechTranscriptionService) { self.speech = speech }
 
     func start(_ packet: LivePacket) throws {
+        guard packet.streamID != nil else { throw SpeechFailure.unavailable }
+        if recordingID == packet.recordingID, packet.sequence <= lastSequence {
+            throw SpeechFailure.unavailable
+        }
         stop(notify: false)
         _ = try speech.recognizer()
-        gate.begin(packet.recordingID, sequence: packet.sequence)
+        gate.begin(packet.recordingID, sequence: packet.sequence, streamID: packet.streamID)
         prefix = ""
         partial = ""
-        try openWindow()
+        do { try openWindow() }
+        catch { stop(notify: false); throw error }
         touchWatchdog()
     }
 
@@ -37,7 +43,7 @@ final class LiveTranscriptionService {
                                          channels: 1, interleaved: false),
               let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(bytes.count / 2)),
               let pointer = buffer.int16ChannelData?[0],
-              gate.accept(packet.recordingID, sequence: packet.sequence) else {
+              gate.accept(packet.recordingID, sequence: packet.sequence, streamID: packet.streamID) else {
             throw SpeechFailure.unavailable
         }
         if Date().timeIntervalSince(windowStarted) > 45 {
@@ -74,11 +80,11 @@ final class LiveTranscriptionService {
                 if let text {
                     self.partial = text
                     self.onSubtitle?(LivePacket(kind: .subtitle, recordingID: id, sequence: self.lastSequence,
-                                               text: String((self.prefix + text).suffix(2_000))))
+                                               text: String((self.prefix + text).suffix(2_000)), streamID: self.streamID))
                 }
                 if error != nil {
                     self.onSubtitle?(LivePacket(kind: .unavailable, recordingID: id, sequence: self.lastSequence,
-                                               text: "实时识别中断，完整录音将在同步后转写。"))
+                                               text: "实时识别中断，完整录音将在同步后转写。", streamID: self.streamID))
                     self.stop()
                 } else if final {
                     self.prefix += self.partial.isEmpty ? "" : self.partial + "\n"

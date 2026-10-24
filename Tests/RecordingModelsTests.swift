@@ -54,6 +54,8 @@ final class RecordingModelsTests: XCTestCase {
         XCTAssertTrue(gate.accept(id, sequence: 91))
         gate.end()
         XCTAssertFalse(gate.accept(id, sequence: 92))
+        gate.begin(id, sequence: Int.max)
+        XCTAssertFalse(gate.accept(id, sequence: 0))
     }
 
     func testCheckpointAndEditedChineseTextSurviveDiskRoundTrip() throws {
@@ -71,5 +73,18 @@ final class RecordingModelsTests: XCTestCase {
         XCTAssertEqual(restored.transcript, record.transcript)
         XCTAssertEqual(restored.state, .failed)
         XCTAssertEqual(restored.error, record.error)
+    }
+
+    func testReconnectRejectsPacketsFromPreviousStreamOfSameRecording() throws {
+        let id = UUID()
+        let oldStream = UUID()
+        let newStream = UUID()
+        var gate = LiveSequenceGate()
+        gate.begin(id, sequence: 10, streamID: newStream)
+        XCTAssertFalse(gate.accept(id, sequence: 11, streamID: oldStream))
+        XCTAssertFalse(gate.accept(id, sequence: 11))
+        XCTAssertTrue(gate.accept(id, sequence: 11, streamID: newStream))
+        let packet = LivePacket(kind: .subtitle, recordingID: id, sequence: 11, text: "新字幕", streamID: newStream)
+        XCTAssertEqual(LivePacket.decode(try packet.encoded())?.streamID, newStream)
     }
 }

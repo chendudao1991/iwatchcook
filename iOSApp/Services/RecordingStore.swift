@@ -9,6 +9,7 @@ final class RecordingStore: ObservableObject {
     private let root: URL
     private let indexURL: URL
     private var deletedIDs: Set<UUID> = []
+    private var snapshot: DurableJSON<Index>?
 
     private struct Index: Codable {
         var recordings: [Recording]
@@ -21,14 +22,14 @@ final class RecordingStore: ObservableObject {
         indexURL = root.appendingPathComponent("index.json")
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            if FileManager.default.fileExists(atPath: indexURL.path) {
-                let saved = try JSONDecoder().decode(Index.self, from: Data(contentsOf: indexURL))
-                recordings = saved.recordings
-                deletedIDs = saved.deletedIDs
-                for i in recordings.indices where recordings[i].state == .transcribing {
-                    recordings[i].state = .failed
-                    recordings[i].error = "上次转写被中断，可从已完成分段继续。"
-                }
+            let snapshot = try DurableJSON(url: indexURL, defaultValue: Index(recordings: [], deletedIDs: []))
+            self.snapshot = snapshot
+            let saved = snapshot.value
+            recordings = saved.recordings
+            deletedIDs = saved.deletedIDs
+            for i in recordings.indices where recordings[i].state == .transcribing {
+                recordings[i].state = .failed
+                recordings[i].error = "上次转写被中断，可从已完成分段继续。"
             }
         } catch { storageError = "读取录音索引失败：\(error.localizedDescription)；原文件未删除。" }
     }
@@ -48,7 +49,7 @@ final class RecordingStore: ObservableObject {
         defer { try? FileManager.default.removeItem(at: staged) }
         // A delayed duplicate must not resurrect a user-deleted recording.
         if deletedIDs.contains(metadata.id) || recording(metadata.id) != nil { return false }
-        guard storageError == nil else { throw StoreError.unavailable }
+        guard snapshot != nil else { throw StoreError.unavailable }
         let audio = try AVAudioFile(forReading: staged)
         guard audio.length > 0 else { throw SpeechFailure.emptyAudio }
         let value = Recording(metadata: metadata)
@@ -56,34 +57,42 @@ final class RecordingStore: ObservableObject {
         if !FileManager.default.fileExists(atPath: target.path) {
             try FileManager.default.copyItem(at: staged, to: target)
         }
-        recordings.insert(value, at: 0)
-        do { try persist() }
-        catch { recordings.removeAll { $0.id == metadata.id }; throw error }
+        var candidate = recordings
+        candidate.insert(value, at: 0)
+        try persist(candidate, deletedIDs: deletedIDs)
         return true
     }
 
-    func update(_ id: UUID, _ change: (inout Recording) -> Void) {
+    func update(_ id: UUID, _ change: (inout Recording) -> Void) throws {
         guard let i = recordings.firstIndex(where: { $0.id == id }) else { return }
-        change(&recordings[i])
-        do { try persist() } catch { storageError = error.localizedDescription }
+        var candidate = recordings
+        change(&candidate[i])
+        try persist(candidate, deletedIDs: deletedIDs)
     }
 
     func delete(_ id: UUID) throws {
         guard let value = recording(id) else { return }
-        let old = recordings
-        recordings.removeAll { $0.id == id }
-        deletedIDs.insert(id)
-        do { try persist() }
-        catch { recordings = old; deletedIDs.remove(id); throw error }
+        let candidate = recordings.filter { $0.id != id }
+        var tombstones = deletedIDs
+        tombstones.insert(id)
+        try persist(candidate, deletedIDs: tombstones)
         // Tombstone is durable before removing the audio.
         if FileManager.default.fileExists(atPath: audioURL(value).path) {
             try FileManager.default.removeItem(at: audioURL(value))
         }
     }
 
-    private func persist() throws {
-        let bytes = try JSONEncoder().encode(Index(recordings: recordings, deletedIDs: deletedIDs))
-        try bytes.write(to: indexURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    private func persist(_ candidate: [Recording], deletedIDs tombstones: Set<UUID>) throws {
+        guard let snapshot else { throw StoreError.unavailable }
+        do {
+            try snapshot.commit(Index(recordings: candidate, deletedIDs: tombstones))
+            recordings = candidate
+            deletedIDs = tombstones
+            storageError = nil
+        } catch {
+            storageError = "保存失败，尚未确认本次更改：\(error.localizedDescription)"
+            throw error
+        }
     }
 
     enum StoreError: LocalizedError {

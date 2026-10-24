@@ -59,7 +59,7 @@ final class PhoneConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
             } catch {
                 self.error = error.localizedDescription
                 self.send(LivePacket(kind: .unavailable, recordingID: packet.recordingID,
-                                     sequence: packet.sequence, text: error.localizedDescription))
+                                     sequence: packet.sequence, text: error.localizedDescription, streamID: packet.streamID))
                 replyHandler(["ok": false])
             }
         }

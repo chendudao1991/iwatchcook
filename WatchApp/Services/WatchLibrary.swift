@@ -16,6 +16,7 @@ final class WatchLibrary: ObservableObject {
     @Published var error: String?
     private let root: URL
     private let index: URL
+    private var snapshot: DurableJSON<[WatchRecording]>?
 
     init() {
         root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -23,8 +24,10 @@ final class WatchLibrary: ObservableObject {
         index = root.appendingPathComponent("index.json")
         do {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            if FileManager.default.fileExists(atPath: index.path) {
-                items = try JSONDecoder().decode([WatchRecording].self, from: Data(contentsOf: index))
+            let snapshot = try DurableJSON(url: index, defaultValue: [WatchRecording]())
+            self.snapshot = snapshot
+            items = snapshot.value
+            if !items.isEmpty {
                 // A crash/relaunch may leave an open recording. Recover its readable PCM frames.
                 for i in items.indices where !items[i].finalized {
                     do {
@@ -37,7 +40,7 @@ final class WatchLibrary: ObservableObject {
                         items[i].syncError = "中断文件无法自动恢复，保留原文件：\(error.localizedDescription)"
                     }
                 }
-                try persist()
+                try persist(items)
             }
         } catch { self.error = "录音库恢复失败：\(error.localizedDescription)。已有文件不会被覆盖。" }
     }
@@ -45,42 +48,51 @@ final class WatchLibrary: ObservableObject {
     func audioURL(_ id: UUID) -> URL { root.appendingPathComponent("\(id.uuidString).caf") }
 
     func register(_ metadata: RecordingMetadata) throws {
-        guard error == nil else { throw LibraryError.unavailable }
-        items.insert(WatchRecording(metadata: metadata), at: 0)
-        do { try persist() } catch { items.removeAll { $0.id == metadata.id }; throw error }
+        guard snapshot != nil else { throw LibraryError.unavailable }
+        var candidate = items
+        candidate.insert(WatchRecording(metadata: metadata), at: 0)
+        try persist(candidate)
     }
 
     func finish(_ id: UUID, duration: Double) throws {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
-        items[i].metadata.duration = duration
-        items[i].finalized = duration > 0
-        if duration == 0 { items[i].syncError = "没有可用音频，未加入同步队列。" }
-        try persist()
+        var candidate = items
+        candidate[i].metadata.duration = duration
+        candidate[i].finalized = duration > 0
+        if duration == 0 { candidate[i].syncError = "没有可用音频，未加入同步队列。" }
+        try persist(candidate)
     }
 
     func acknowledge(_ id: UUID) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
-        items[i].acknowledged = true
-        items[i].syncError = nil
-        do { try persist() } catch { self.error = error.localizedDescription }
+        var candidate = items
+        candidate[i].acknowledged = true
+        candidate[i].syncError = nil
+        do { try persist(candidate) } catch { self.error = error.localizedDescription }
     }
 
     func transferFailed(_ id: UUID, message: String) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
-        items[i].syncError = message
-        do { try persist() } catch { self.error = error.localizedDescription }
+        var candidate = items
+        candidate[i].syncError = message
+        do { try persist(candidate) } catch { self.error = error.localizedDescription }
     }
 
     func removeAcknowledged(_ id: UUID) throws {
         guard let item = items.first(where: { $0.id == id }), item.acknowledged else { return }
         // The phone has acknowledged its durable copy; only then allow deleting the Watch copy.
-        try FileManager.default.removeItem(at: audioURL(id))
-        items.removeAll { $0.id == id }
-        try persist()
+        // Keep the manifest entry if removing the file fails; tolerate an earlier successful removal.
+        if FileManager.default.fileExists(atPath: audioURL(id).path) {
+            try FileManager.default.removeItem(at: audioURL(id))
+        }
+        try persist(items.filter { $0.id != id })
     }
 
-    private func persist() throws {
-        try JSONEncoder().encode(items).write(to: index, options: .atomic)
+    private func persist(_ candidate: [WatchRecording]) throws {
+        guard let snapshot else { throw LibraryError.unavailable }
+        try snapshot.commit(candidate)
+        items = candidate
+        error = nil
     }
 
     enum LibraryError: LocalizedError {

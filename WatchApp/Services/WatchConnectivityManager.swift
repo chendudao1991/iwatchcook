@@ -58,8 +58,10 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
             return
         }
         liveStatus = "正在请求实时识别"
+        sequence += 1
+        subtitleSequence = sequence
         let token = epoch
-        transmit(LivePacket(kind: .start, recordingID: id, sequence: sequence), token: token) { [weak self] ok in
+        transmit(LivePacket(kind: .start, recordingID: id, sequence: sequence, streamID: token), token: token) { [weak self] ok in
             self?.ready = ok
             self?.liveStatus = ok ? "实时字幕已连接" : "实时不可用；本地录音继续，可重连"
         }
@@ -74,7 +76,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
         }
         sequence += 1
         inFlight = true
-        transmit(LivePacket(kind: .audio, recordingID: id, sequence: sequence, pcm: bytes), token: epoch) { [weak self] ok in
+        transmit(LivePacket(kind: .audio, recordingID: id, sequence: sequence, pcm: bytes, streamID: epoch), token: epoch) { [weak self] ok in
             guard let self else { return }
             self.inFlight = false
             if !ok { self.ready = false; self.liveStatus = "实时发送失败；本地录音继续" }
@@ -83,7 +85,7 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
 
     func endLive() {
         if let id = liveID, reachable {
-            transmit(LivePacket(kind: .stop, recordingID: id, sequence: sequence), token: epoch) { _ in }
+            transmit(LivePacket(kind: .stop, recordingID: id, sequence: sequence, streamID: epoch), token: epoch) { _ in }
         }
         epoch = UUID()
         liveID = nil
@@ -110,7 +112,8 @@ final class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDeleg
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         guard let bytes = message["packet"] as? Data, let packet = LivePacket.decode(bytes) else { return }
         Task { @MainActor in
-            guard packet.recordingID == self.liveID, packet.sequence >= self.subtitleSequence else { return }
+            guard packet.recordingID == self.liveID, packet.streamID == self.epoch,
+                  packet.sequence >= self.subtitleSequence else { return }
             self.subtitleSequence = packet.sequence
             if packet.kind == .subtitle { self.subtitle = packet.text ?? "" }
             if packet.kind == .unavailable {
