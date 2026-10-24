@@ -1,0 +1,19 @@
+name: Native checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-22.04
+    container: swift:6.0.3-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --jobs 2
+  apple:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: bash scripts/check_apple.sh
