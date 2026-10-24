@@ -50,6 +50,12 @@
 - 长音频边界断词、静音段失败、长时间容量与功耗问题见 `ARCHITECTURE.md`。
 - GitHub API 读取返回 `Forbidden`；当前网络自定义白名单不含 `api.github.com`。
   已保存该域名和可复用安装／启动检查指令到环境配置草稿，但保存不代表运行环境已更新或发布。
-- PR 和推送的实际结果将在后续提交记录中补充；本记录不宣称已经创建 PR。
+- 首次实现提交：`d07cd76`；分支已通过现有 Git 代理成功推送至远端，未修改 `main`。
+- 实际执行 `gh pr create --draft ... --body-file docs/PR_DESCRIPTION.md`，
+  `POST https://api.github.com/graphql` 返回 `Forbidden`，**PR 尚未创建**。
+  Git 推送权限已验证；GitHub API 网络／授权尚未验证可用。
+  需在环境设置审阅并保存新增 `api.github.com` 域名的草稿、发布环境，再重试 API 操作。
+  如仍受限，再检查仓库 Pull requests 写入权限；不要在聊天中提供 token。
+  手动创建入口：<https://github.com/chendudao1991/iwatchcook/pull/new/feat/wristnoteai-native-mvp>。
 
 验收清单全部保留未勾选状态，等待真实 macOS／设备验证。
