@@ -11,7 +11,8 @@ Apple Watch + iPhone 原生录音转文字 App。在当前 `iwatchcook` 仓库�
 - 实时：16 kHz mono Int16 分片、iPhone Speech 识别、双端字幕、连接状态、失败降级、本地完整音频兜底。
 - 隐私：默认设备本地识别；在线 Apple Speech 需用户明确开启并完成系统授权。
 
-本地 Linux 可验证共享层；远端 macOS CI 已验证 `feebae8` 的双端模拟器构建与 9 项 XCTest。
+本地 Linux 可验证共享层；[远端 macOS CI](https://github.com/chendudao1991/iwatchcook/actions/runs/40102949039)
+已验证源码提交 `59ddecc` 的双端模拟器构建与 **10 项 XCTest（0 失败、0 跳过）**。
 后续提交的验证结果见 [开发记录](docs/DEVELOPMENT_LOG.md)。**尚未经过真机验收**。
 
 ## macOS 上生成和运行
@@ -80,6 +81,7 @@ Swift 共享层测试不包含 AVFoundation、Speech、WatchConnectivity 或 Swi
 
 - [PRD](docs/PRD.md)
 - [验收清单](docs/ACCEPTANCE_CHECKLIST.md)
+- [配对真机执行步骤](docs/DEVICE_TEST_PLAN.md)
 - [架构与恢复约定](docs/ARCHITECTURE.md)
 - [开发与验证记录](docs/DEVELOPMENT_LOG.md)
 - [原始开发任务文档](CODEX_PROMPT.md)

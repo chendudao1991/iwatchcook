@@ -88,3 +88,16 @@
 - 旧录音音频回调的延迟错误不得停止新的录音；识别任务取消早于启动时明确返回取消而不挂起。
 - 本地最新共享层 **10 个 XCTest、0 失败**；结果检查器 **4 项测试通过**；19 份 Swift
   语法树、compiler parse、shell 和 whitespace 检查通过。最新远端验证结果待该提交的 CI 完成。
+
+### 最新原生验证证据
+
+- 源码提交：`59ddecc571b08b7040d6130430774b86e4438006`。
+- 运行：<https://github.com/chendudao1991/iwatchcook/actions/runs/40102949039>，结论 success。
+- 原始日志确认：XcodeGen 生成工程、iOS Simulator build 成功、watchOS Simulator build 成功。
+- iPhone simulator XCTest 与 xcresult 检查器均确认：**10 passed、0 failed、0 skipped**。
+- 该运行的 Linux core job 也实际执行 10 个 XCTest，0 失败。
+- CI 的 native-validation artifact 保存 native-check.log、当前运行的 xcresult 与 summary JSON。
+- PR 已更新：<https://github.com/chendudao1991/iwatchcook/pull/1>，保持 draft，不自动合并。
+- `gh pr edit` 曾因旧 CLI 查询已弃用 Projects classic 字段失败；改用 GitHub REST PATCH 更新 PR 描述成功。
+- 后续文档提交不改变以上已验证源码。配对真机步骤见 `DEVICE_TEST_PLAN.md`；真机、后台、
+  语音识别准确率与商店签名仍未验证。验收清单不因共享层 XCTest 或模拟器 build 成功而自动勾选。
