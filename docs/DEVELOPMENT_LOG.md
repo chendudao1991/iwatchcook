@@ -115,3 +115,14 @@
 - 新增 4 个 WatchLibrary 测试，在 iPhone 模拟器上运行同一库源码：重启恢复、保留不可读文件后手动重试、
   损坏索引保护、接收确认前禁止清理音频。它们不是真实 Watch 录音／后台测试。
 - 最新 CI 最低测试数量提高为 24；23 份 Swift 语法树与 compiler parse、结果检查器测试在 Linux 上通过。
+
+### 本阶段实际验证结果
+
+- 源码：`23c8c4efad520baa99befe355c1a0c2bf6576c17`；
+  [远端运行 40103871821](https://github.com/chendudao1991/iwatchcook/actions/runs/40103871821) 结论 success。
+- 已读取原始日志，确认双端 `BUILD SUCCEEDED`、iOS `TEST SUCCEEDED`，结果检查器报告
+  **24 passed / 0 failed / 0 skipped**。其中共享层 10、iPhone 存储 6、导出 4、WatchLibrary 4。
+- `RecordingStoreTests`、`TranscriptExporterTests`、`WatchLibraryTests` 三个原生服务测试 suite 均实际执行并通过。
+- native-validation artifact 已存在且未过期，含原始日志、当前运行的 xcresult 与 JSON 摘要。
+- 验收清单仅将 XcodeGen 生成、双端模拟器编译、对应构建日志检查标为完成；其余用户流程及真机项继续未勾选。
+- 后续文档提交不改变以上已验证的源码、测试或工程配置。

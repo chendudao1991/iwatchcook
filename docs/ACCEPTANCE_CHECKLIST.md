@@ -1,10 +1,12 @@
 # MVP 验收清单
 
-> 初始状态：待在 macOS/Xcode 中构建与真机验证。不要将未运行的检查标记为通过。
+> 更新：源码 `23c8c4e` 已在远端 macOS 完成双端模拟器构建与 24 项 XCTest。
+> [验证日志与结果包](https://github.com/chendudao1991/iwatchcook/actions/runs/40103871821)。
+> 勾选仅代表该项所述验证，模拟器结果不代表配对真机、签名、录音或 Speech 准确率通过。
 
 ## A. 工程与权限
-- [ ] XcodeGen 成功生成 iOS + watchOS 工程。
-- [ ] iOS 和 watchOS 两个 target 均能编译。
+- [x] XcodeGen 成功生成 iOS + watchOS 工程。
+- [x] iOS 和 watchOS 两个 target 均能编译。（模拟器，未签名）
 - [ ] 两个 target 的 Bundle ID、Watch App 嵌入、签名和配对配置正确。
 - [ ] 首次使用正确请求麦克风权限。
 - [ ] iPhone 端正确请求语音识别权限。
@@ -44,6 +46,6 @@
 - [ ] 隐私政策、麦克风和语音识别用途说明已完成。
 
 ## G. 构建报告
-- [ ] Xcode 构建日志无错误。
+- [x] Xcode 构建日志无错误。（上述模拟器 CI 运行）
 - [ ] 在真实 iPhone + Apple Watch 上完成核心流程。
 - [ ] 明确记录未通过项、设备型号、系统版本和复现步骤。
