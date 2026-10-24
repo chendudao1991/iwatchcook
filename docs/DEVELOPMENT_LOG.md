@@ -1,0 +1,128 @@
+# 开发与验证记录
+
+## 2026-10-24：首版实现
+
+### 输入与分支
+
+- 当前仓库：`chendudao1991/iwatchcook`，起点 `c74e9c39b1c9f07dcd0df27ac5ec0d25e923e467`，只有两行 README。
+- 分支：`feat/wristnoteai-native-mvp`。
+- 接收四份 Markdown 需求文档；没有收到 Swift 源码、工程配置或 `AGENTS.md`。
+- 将需求保存在 `docs/PRD.md`、`docs/ACCEPTANCE_CHECKLIST.md` 和 `CODEX_PROMPT.md`。
+- 用户已明确要求修改源码，所以本阶段是开发任务，而非仅环境安装。
+
+### 实现清单
+
+- `project.yml`：iOS 17 / watchOS 10 双应用与共享 XCTest target，Watch App 嵌入、独立运行声明和权限说明。
+- `Shared/RecordingModels.swift`：录音元数据、持久化模型、带版本与序号的实时协议、分段计划。
+- `WatchApp/Services`：本地 CAF 录音／恢复、传输队列／接收确认、实时流失败降级。
+- `WatchApp`：录音模式、时长、字幕、连接状态、录音库与已确认副本删除。
+- `iOSApp/Services`：持久化接收、去重／删除 tombstone、串行转写队列、分段检查点、Speech 请求取消与超时、实时字幕回传。
+- `iOSApp`：列表／搜索、播放、删除、文字编辑、TXT／音频分享与识别隐私设置。
+- `Tests` / `Package.swift`：可在 Linux 上实际运行的 Foundation 共享逻辑 XCTest。
+- `scripts` / `.github/workflows`：环境安装、静态校验、共享层测试及后续 macOS 构建验证入口。
+
+### 已运行检查
+
+- Swift 6.0.3 工具链来自 Swift 官方下载站；使用官方 Swift 网站 Git 仓库的公钥验证发布包签名。
+  签名指纹 `52BB7E3DE28A71BE22EC05FFEF80A866B47A981F`，验证成功后才解包使用。
+- `bash scripts/setup_linux.sh`：依赖准备及其当时的 4 项共享测试通过；复用已验证的工具链。
+- 最新 `bash scripts/test_core.sh`：**5 个 XCTest、0 失败**，覆盖中文编辑与分段检查点磁盘往返、
+  元数据校验、实时包大小校验、乱序／旧会话拒绝、5/30/60 分钟分段范围完整性。
+  runner 另显示的 Swift Testing `0 tests` 是未使用的第二测试框架，不是 XCTest 的执行数量。
+- `check_project.py`：工程配置一致性与 16 份 Swift 文件（包含 Package.swift）的语法树检查通过。
+- `swiftc -frontend -parse`：Apple 端及共享／测试 Swift 源码语法解析通过；此模式不加载 Apple SDK 或检查 API 类型。
+- `bash -n scripts/*.sh`、`git diff --check`：通过。
+
+### 修复的实施问题
+
+- SwiftPM 初次执行因用户 home 只读无法写 module cache 而失败；改用任务级 cache/config/security 路径后通过。
+- 修正实时重连释放旧任务时意外启动录后任务的竞争；在线识别设置改变时取消已有任务。
+- 手机在 delegate 返回前复制 WC 临时文件；只有持久化后才发送接收确认。
+- 不将空录音加入传输队列；恢复失败的单个文件不会覆盖已有录音库。
+- 实时字幕长度有上限；实时序号缺口、旧会话和拥塞均降级，不影响本地音频写入。
+
+### 未运行与未完成事项
+
+- **没有 Xcode 或 Apple SDK：未生成 Xcode 工程、未做 Apple 平台类型检查、未执行 iOS/watchOS 构建或模拟器测试。**
+- **没有真实设备：录音、后台、CAF 中断恢复、WatchConnectivity、Speech 实际准确率均未真机验证。**
+- GitHub Actions 配置已写入，但本地无法证明远端 CI 已运行。
+- 签名团队、正式 Bundle ID、App 图标及商店隐私材料尚需配置。
+- 长音频边界断词、静音段失败、长时间容量与功耗问题见 `ARCHITECTURE.md`。
+- GitHub API 读取返回 `Forbidden`；当前网络自定义白名单不含 `api.github.com`。
+  已保存该域名和可复用安装／启动检查指令到环境配置草稿，但保存不代表运行环境已更新或发布。
+- 首次实现提交：`d07cd76`；分支已通过现有 Git 代理成功推送至远端，未修改 `main`。
+- 实际执行 `gh pr create --draft ... --body-file docs/PR_DESCRIPTION.md`，
+  `POST https://api.github.com/graphql` 返回 `Forbidden`，**PR 尚未创建**。
+  Git 推送权限已验证；GitHub API 网络／授权尚未验证可用。
+  需在环境设置审阅并保存新增 `api.github.com` 域名的草稿、发布环境，再重试 API 操作。
+  如仍受限，再检查仓库 Pull requests 写入权限；不要在聊天中提供 token。
+  手动创建入口：<https://github.com/chendudao1991/iwatchcook/pull/new/feat/wristnoteai-native-mvp>。
+
+验收清单全部保留未勾选状态，等待真实 macOS／设备验证。
+
+## 2026-10-24：恢复与并发加固
+
+- GitHub API 已恢复可用；已实际创建草稿 PR：<https://github.com/chendudao1991/iwatchcook/pull/1>。
+- 旧提交 `37d5c3b` 的远端运行 `40100334455` 报告 core、apple 两个 job 均成功，
+  apple 中 XcodeGen 安装与 `check_apple.sh` 步骤报告成功。下载日志的目标域名被拒绝，
+  尚不能据此报告该次模拟器测试数量；新增日志域名至环境草稿，尚不等于已应用。
+- 新增双端原子索引提交：写盘失败不发布候选状态，损坏索引不重置；可恢复的临时写盘失败支持重试。
+- 分段检查点写盘失败会立即结束转写，避免“已完成但未保存”；编辑保存失败保留编辑内容并显示错误。
+- 切换到实时识别前同步取消旧识别请求；实时启动失败释放会话，避免堵塞录后队列。
+- 每次实时重连增加 stream ID，拒绝旧流音频／字幕／停止消息；防止极大序号触发整型溢出。
+- 完成态不再显示会覆盖用户编辑内容的“继续转写”按钮；从头转写仍需明确确认。
+- 本阶段本地共享层 **9 个 XCTest、0 失败**；18 份 Swift 语法树和 compiler parse 通过。
+- 新增 XCTest 结果检查器：拒绝零测试、全部跳过或失败的 xcresult；CI 保存原始日志和结果包，
+  以最新提交的实际运行结果为准。本地未运行原生应用构建或真机验证。
+- 补充音频原子接收：无索引的同名孤立文件不再直接复用，重传以验证后的临时文件替换；
+  音频使用首次解锁后保护，以便之后锁屏场景可读，实际后台行为仍需设备验证。
+- 随后日志域名访问已可用。已读取运行 `40102547763` 的原始日志，确认 `feebae8`：
+  iOS 与 watchOS simulator build 均为 `BUILD SUCCEEDED`，iOS simulator XCTest 为
+  `TEST SUCCEEDED`，结果包检查器确认 **9 passed / 0 failed / 0 skipped**。
+  这是真实远端 macOS 验证，不是本地 Linux 构建，也不是真机验证。
+
+### 有限自动重连
+
+- 实时发送／识别失败后按 1/2/4/8/16/30 秒退避重连，达到六次后停止自动尝试，保留本地录音。
+- 成功音频确认、手动重连或可达性恢复会重置预算；停止录音时取消定时器。
+- 旧录音音频回调的延迟错误不得停止新的录音；识别任务取消早于启动时明确返回取消而不挂起。
+- 本地最新共享层 **10 个 XCTest、0 失败**；结果检查器 **4 项测试通过**；19 份 Swift
+  语法树、compiler parse、shell 和 whitespace 检查通过。最新远端验证结果待该提交的 CI 完成。
+
+### 最新原生验证证据
+
+- 源码提交：`59ddecc571b08b7040d6130430774b86e4438006`。
+- 运行：<https://github.com/chendudao1991/iwatchcook/actions/runs/40102949039>，结论 success。
+- 原始日志确认：XcodeGen 生成工程、iOS Simulator build 成功、watchOS Simulator build 成功。
+- iPhone simulator XCTest 与 xcresult 检查器均确认：**10 passed、0 failed、0 skipped**。
+- 该运行的 Linux core job 也实际执行 10 个 XCTest，0 失败。
+- CI 的 native-validation artifact 保存 native-check.log、当前运行的 xcresult 与 summary JSON。
+- PR 已更新：<https://github.com/chendudao1991/iwatchcook/pull/1>，保持 draft，不自动合并。
+- `gh pr edit` 曾因旧 CLI 查询已弃用 Projects classic 字段失败；改用 GitHub REST PATCH 更新 PR 描述成功。
+- 后续文档提交不改变以上已验证源码。配对真机步骤见 `DEVICE_TEST_PLAN.md`；真机、后台、
+  语音识别准确率与商店签名仍未验证。验收清单不因共享层 XCTest 或模拟器 build 成功而自动勾选。
+
+## iPhone 存储集成与文档导出
+
+- 新增独立 iOS XCTest target，直接编译实际 RecordingStore、Speech 服务与导出服务，不替换成模拟实现。
+- 6 个存储服务测试：实际 CAF 接收与重复传输、删除 tombstone 重启后去重、孤立音频替换、
+  无效音频拒绝、损坏索引保护、转写中断后的分段恢复。
+- 新增 PDF 与 RTF 导出；4 个导出测试覆盖 UTF-8 原文、PDF 中文回读、多页末段完整性和 RTF 中文／emoji 回读。
+- 与既有 10 个共享层测试合计，macOS CI 应实际执行至少 20 个 XCTest；零测试或遗漏整个测试 target 会失败。
+- 本地 22 份 Swift 语法树、compiler parse、项目声明、结果检查器 4 项测试和 whitespace 检查通过。
+  本地 Linux 不执行新的 Apple 框架测试；以本阶段远端 CI 结果为准。
+- 随后新增“重试本地保存”，只在录音停止后恢复 CAF 可读帧并重新提交 manifest，解除临时写盘失败后的操作阻塞。
+- 新增 4 个 WatchLibrary 测试，在 iPhone 模拟器上运行同一库源码：重启恢复、保留不可读文件后手动重试、
+  损坏索引保护、接收确认前禁止清理音频。它们不是真实 Watch 录音／后台测试。
+- 最新 CI 最低测试数量提高为 24；23 份 Swift 语法树与 compiler parse、结果检查器测试在 Linux 上通过。
+
+### 本阶段实际验证结果
+
+- 源码：`23c8c4efad520baa99befe355c1a0c2bf6576c17`；
+  [远端运行 40103871821](https://github.com/chendudao1991/iwatchcook/actions/runs/40103871821) 结论 success。
+- 已读取原始日志，确认双端 `BUILD SUCCEEDED`、iOS `TEST SUCCEEDED`，结果检查器报告
+  **24 passed / 0 failed / 0 skipped**。其中共享层 10、iPhone 存储 6、导出 4、WatchLibrary 4。
+- `RecordingStoreTests`、`TranscriptExporterTests`、`WatchLibraryTests` 三个原生服务测试 suite 均实际执行并通过。
+- native-validation artifact 已存在且未过期，含原始日志、当前运行的 xcresult 与 JSON 摘要。
+- 验收清单仅将 XcodeGen 生成、双端模拟器编译、对应构建日志检查标为完成；其余用户流程及真机项继续未勾选。
+- 后续文档提交不改变以上已验证的源码、测试或工程配置。

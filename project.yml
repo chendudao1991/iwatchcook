@@ -1,0 +1,85 @@
+name: WristNoteAI
+options:
+  minimumXcodeGenVersion: 2.42.0
+  deploymentTarget:
+    iOS: '17.0'
+    watchOS: '10.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: ''
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+targets:
+  WristNoteAI:
+    type: application
+    platform: iOS
+    sources: [Shared, iOSApp]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.WristNoteAI
+        TARGETED_DEVICE_FAMILY: '1'
+    info:
+      path: iOSApp/Info.plist
+      properties:
+        CFBundleDisplayName: 腕录 AI
+        UILaunchScreen: {}
+        NSMicrophoneUsageDescription: 实时转写使用从手表传来的录音音频。
+        NSSpeechRecognitionUsageDescription: 将录音转为中文文字；系统识别服务可能把音频发送给 Apple。
+    dependencies:
+      - target: WristNoteWatch
+        embed: true
+  WristNoteWatch:
+    type: application
+    platform: watchOS
+    sources: [Shared, WatchApp]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.WristNoteAI.watchkitapp
+        SDKROOT: watchos
+        TARGETED_DEVICE_FAMILY: '4'
+    info:
+      path: WatchApp/Info.plist
+      properties:
+        CFBundleDisplayName: 腕录 AI
+        WKApplication: true
+        WKWatchOnly: false
+        WKRunsIndependentlyOfCompanionApp: true
+        WKCompanionAppBundleIdentifier: com.example.WristNoteAI
+        UIBackgroundModes: [audio]
+        NSMicrophoneUsageDescription: 在手表本地录制音频，保存后同步到配对的 iPhone。
+  WristNoteCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.WristNoteAI.CoreTests
+        GENERATE_INFOPLIST_FILE: YES
+  WristNotePhoneTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Shared
+      - AppleTests
+      - iOSApp/Services/RecordingStore.swift
+      - iOSApp/Services/SpeechTranscriptionService.swift
+      - iOSApp/Services/TranscriptExporter.swift
+      - WatchApp/Services/WatchLibrary.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.WristNoteAI.PhoneTests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  WristNoteAI:
+    build:
+      targets:
+        WristNoteAI: all
+        WristNoteWatch: all
+    test:
+      targets: [WristNoteCoreTests, WristNotePhoneTests]
+  WristNoteWatch:
+    build:
+      targets:
+        WristNoteWatch: all

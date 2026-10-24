@@ -1,0 +1,30 @@
+name: Native checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-22.04
+    container: swift:6.0.3-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --jobs 2
+  apple:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: python3 scripts/test_xcresult.py
+      - run: bash scripts/check_apple.sh 2>&1 | tee native-check.log
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-validation
+          path: |
+            native-check.log
+            ${{ env.WRISTNOTE_RESULT_BUNDLE }}
+            ${{ env.WRISTNOTE_RESULT_BUNDLE }}.summary.json
+          if-no-files-found: warn
