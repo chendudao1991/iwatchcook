@@ -36,7 +36,7 @@ for name, target in targets.items():
         require((ROOT / source).exists(), f"Missing source directory: {name}/{source}")
 
 parser = Parser(Language(tree_sitter_swift.language()))
-sources = sorted(path for directory in ["Shared", "iOSApp", "WatchApp", "Tests"]
+sources = sorted(path for directory in ["Shared", "iOSApp", "WatchApp", "Tests", "AppleTests"]
                  for path in (ROOT / directory).rglob("*.swift")) + [ROOT / "Package.swift"]
 for source in sources:
     tree = parser.parse(source.read_bytes())

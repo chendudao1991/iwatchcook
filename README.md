@@ -7,7 +7,7 @@ Apple Watch + iPhone 原生录音转文字 App。在当前 `iwatchcook` 仓库�
 
 - Watch：实时／录后模式、麦克风授权、独立本地录音、时长、异常保存、本地录音列表。
 - 同步：WatchConnectivity 文件队列、UUID 去重、手机持久化接收确认、断连后重试、删除 tombstone。
-- iPhone：原音频播放、搜索、中文录后转写、40 秒分段检查点、失败重试、文字编辑、TXT／音频导出。
+- iPhone：原音频播放、搜索、中文录后转写、40 秒分段检查点、失败重试、文字编辑、TXT／PDF／RTF／音频导出。
 - 实时：16 kHz mono Int16 分片、iPhone Speech 识别、双端字幕、连接状态、失败降级、本地完整音频兜底。
 - 隐私：默认设备本地识别；在线 Apple Speech 需用户明确开启并完成系统授权。
 
@@ -74,7 +74,7 @@ Swift 共享层测试不包含 AVFoundation、Speech、WatchConnectivity 或 Swi
 - 实时字幕只保留最近 2,000 字；轮换、断连、拥塞可能造成实时文字缺失，完整录音录后转写提供最终全文。
 - 40 秒分段有边界断词风险，暂无词级重叠去重；无声段报错时不会静默跳过。
 - 后台／锁屏持续录音与实时字幕、崩溃后 CAF 恢复都必须在真机验证。
-- 当前导出 TXT 和原音频；Word／PDF、暂停恢复、iCloud、摘要不属于已实现内容。
+- 当前导出 TXT、PDF、RTF 和原音频；RTF 可由 Word 打开，不是 `.docx`。暂停恢复、iCloud、摘要尚未实现。
 - 正式上架仍需图标、正式隐私政策 URL、App Store 隐私标签、签名与发布配置。
 
 ## 项目文档

@@ -3,14 +3,14 @@ import AVFoundation
 import UniformTypeIdentifiers
 
 struct TranscriptDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.plainText] }
-    var text: String
-    init(text: String) { self.text = text }
+    static var readableContentTypes: [UTType] { [.plainText, .pdf, .rtf] }
+    var data: Data
+    init(data: Data) { self.data = data }
     init(configuration: ReadConfiguration) throws {
-        text = String(data: configuration.file.regularFileContents ?? Data(), encoding: .utf8) ?? ""
+        data = configuration.file.regularFileContents ?? Data()
     }
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: Data(text.utf8))
+        FileWrapper(regularFileWithContents: data)
     }
 }
 
@@ -25,6 +25,8 @@ struct RecordingDetailView: View {
     @State private var loaded = false
     @State private var player: AVAudioPlayer?
     @State private var showExport = false
+    @State private var exportDocument = TranscriptDocument(data: Data())
+    @State private var exportType: UTType = .plainText
     @State private var showDelete = false
     @State private var showRestart = false
     @State private var error: String?
@@ -64,7 +66,11 @@ struct RecordingDetailView: View {
                                 dirty = false
                             } catch { self.error = "更改尚未保存：\(error.localizedDescription)" }
                         }.disabled(record.state == .transcribing)
-                        Button("导出 TXT") { showExport = true }
+                        Menu("导出文字") {
+                            Button("TXT") { prepareExport(.txt, record: record) }
+                            Button("PDF") { prepareExport(.pdf, record: record) }
+                            Button("RTF（Word 可打开）") { prepareExport(.rtf, record: record) }
+                        }
                         ShareLink("分享文字", item: draft)
                     }
                     if let error { Text(error).foregroundStyle(.red) }
@@ -78,8 +84,8 @@ struct RecordingDetailView: View {
         }
         .navigationTitle("录音详情")
         .onDisappear { player?.stop() }
-        .fileExporter(isPresented: $showExport, document: TranscriptDocument(text: draft),
-                      contentType: .plainText, defaultFilename: "WristNote-\(id.uuidString)") { result in
+        .fileExporter(isPresented: $showExport, document: exportDocument,
+                      contentType: exportType, defaultFilename: "WristNote-\(id.uuidString)") { result in
             if case .failure(let failure) = result { error = failure.localizedDescription }
         }
         .confirmationDialog("删除 iPhone 上的音频与文字？手表副本需单独删除。", isPresented: $showDelete) {
@@ -88,6 +94,15 @@ struct RecordingDetailView: View {
         .confirmationDialog("重新转写将覆盖已保存文字，是否继续？", isPresented: $showRestart) {
             Button("从头转写", role: .destructive) { dirty = false; model.enqueue(id, restart: true) }
         }
+    }
+
+    private func prepareExport(_ format: TranscriptExportFormat, record: Recording) {
+        do {
+            let data = try TranscriptExporter.data(title: title, text: draft, date: record.metadata.createdAt, format: format)
+            exportDocument = TranscriptDocument(data: data)
+            exportType = format.contentType
+            showExport = true
+        } catch { self.error = "导出失败：\(error.localizedDescription)" }
     }
 
     private func play(_ record: Recording) {

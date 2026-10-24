@@ -101,3 +101,13 @@
 - `gh pr edit` 曾因旧 CLI 查询已弃用 Projects classic 字段失败；改用 GitHub REST PATCH 更新 PR 描述成功。
 - 后续文档提交不改变以上已验证源码。配对真机步骤见 `DEVICE_TEST_PLAN.md`；真机、后台、
   语音识别准确率与商店签名仍未验证。验收清单不因共享层 XCTest 或模拟器 build 成功而自动勾选。
+
+## iPhone 存储集成与文档导出
+
+- 新增独立 iOS XCTest target，直接编译实际 RecordingStore、Speech 服务与导出服务，不替换成模拟实现。
+- 6 个存储服务测试：实际 CAF 接收与重复传输、删除 tombstone 重启后去重、孤立音频替换、
+  无效音频拒绝、损坏索引保护、转写中断后的分段恢复。
+- 新增 PDF 与 RTF 导出；4 个导出测试覆盖 UTF-8 原文、PDF 中文回读、多页末段完整性和 RTF 中文／emoji 回读。
+- 与既有 10 个共享层测试合计，macOS CI 应实际执行至少 20 个 XCTest；零测试或遗漏整个测试 target 会失败。
+- 本地 22 份 Swift 语法树、compiler parse、项目声明、结果检查器 4 项测试和 whitespace 检查通过。
+  本地 Linux 不执行新的 Apple 框架测试；以本阶段远端 CI 结果为准。

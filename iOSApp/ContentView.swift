@@ -60,7 +60,7 @@ struct ContentView: View {
                             Button("我已了解，申请语音识别授权") { Task { await model.authorize() } }
                         }
                         Section("数据管理") {
-                            Text("可在录音详情导出音频和 TXT。删除 iPhone 录音不会自动删除手表副本；手表收到接收确认后，可单独删除其本地副本。导出文件由你选择的接收方管理。")
+                            Text("可在录音详情导出音频、TXT、PDF 和可由 Word 打开的 RTF。删除 iPhone 录音不会自动删除手表副本；手表收到接收确认后，可单独删除其本地副本。导出文件由你选择的接收方管理。")
                         }
                     }
                     .navigationTitle("隐私与识别设置")

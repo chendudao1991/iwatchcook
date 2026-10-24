@@ -16,8 +16,8 @@ final class RecordingStore: ObservableObject {
         var deletedIDs: Set<UUID>
     }
 
-    init() {
-        root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    init(directory: URL? = nil) {
+        root = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Recordings", isDirectory: true)
         indexURL = root.appendingPathComponent("index.json")
         do {

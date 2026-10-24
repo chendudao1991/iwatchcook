@@ -57,6 +57,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.WristNoteAI.CoreTests
         GENERATE_INFOPLIST_FILE: YES
+  WristNotePhoneTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Shared
+      - AppleTests
+      - iOSApp/Services/RecordingStore.swift
+      - iOSApp/Services/SpeechTranscriptionService.swift
+      - iOSApp/Services/TranscriptExporter.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.WristNoteAI.PhoneTests
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   WristNoteAI:
     build:
@@ -64,7 +77,7 @@ schemes:
         WristNoteAI: all
         WristNoteWatch: all
     test:
-      targets: [WristNoteCoreTests]
+      targets: [WristNoteCoreTests, WristNotePhoneTests]
   WristNoteWatch:
     build:
       targets:
