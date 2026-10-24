@@ -66,6 +66,7 @@ targets:
       - iOSApp/Services/RecordingStore.swift
       - iOSApp/Services/SpeechTranscriptionService.swift
       - iOSApp/Services/TranscriptExporter.swift
+      - WatchApp/Services/WatchLibrary.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.WristNoteAI.PhoneTests

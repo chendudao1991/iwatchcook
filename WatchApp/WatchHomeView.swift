@@ -33,6 +33,12 @@ struct WatchHomeView: View {
                     Text(recorder.status).font(.caption2)
                     if let error = library.error { Text(error).foregroundStyle(.red).font(.caption2) }
                     if !recorder.recording {
+                        if library.error != nil || library.items.contains(where: { !$0.finalized }) {
+                            Button("重试本地保存") {
+                                do { try library.retrySaving(); connectivity.retryTransfers() }
+                                catch { library.error = error.localizedDescription }
+                            }.disabled(recorder.starting)
+                        }
                         Button("重试同步") { connectivity.retryTransfers() }
                         NavigationLink("本地录音（\(library.items.count)）") {
                             List {

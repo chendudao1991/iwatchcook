@@ -111,3 +111,7 @@
 - 与既有 10 个共享层测试合计，macOS CI 应实际执行至少 20 个 XCTest；零测试或遗漏整个测试 target 会失败。
 - 本地 22 份 Swift 语法树、compiler parse、项目声明、结果检查器 4 项测试和 whitespace 检查通过。
   本地 Linux 不执行新的 Apple 框架测试；以本阶段远端 CI 结果为准。
+- 随后新增“重试本地保存”，只在录音停止后恢复 CAF 可读帧并重新提交 manifest，解除临时写盘失败后的操作阻塞。
+- 新增 4 个 WatchLibrary 测试，在 iPhone 模拟器上运行同一库源码：重启恢复、保留不可读文件后手动重试、
+  损坏索引保护、接收确认前禁止清理音频。它们不是真实 Watch 录音／后台测试。
+- 最新 CI 最低测试数量提高为 24；23 份 Swift 语法树与 compiler parse、结果检查器测试在 Linux 上通过。

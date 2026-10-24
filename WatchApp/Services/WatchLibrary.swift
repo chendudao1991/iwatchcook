@@ -18,8 +18,8 @@ final class WatchLibrary: ObservableObject {
     private let index: URL
     private var snapshot: DurableJSON<[WatchRecording]>?
 
-    init() {
-        root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    init(directory: URL? = nil) {
+        root = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("WatchRecordings", isDirectory: true)
         index = root.appendingPathComponent("index.json")
         do {
@@ -28,24 +28,34 @@ final class WatchLibrary: ObservableObject {
             self.snapshot = snapshot
             items = snapshot.value
             if !items.isEmpty {
-                // A crash/relaunch may leave an open recording. Recover its readable PCM frames.
-                for i in items.indices where !items[i].finalized {
-                    do {
-                        let file = try AVAudioFile(forReading: audioURL(items[i].id))
-                        guard file.length > 0 else { continue }
-                        items[i].metadata.duration = Double(file.length) / file.processingFormat.sampleRate
-                        items[i].finalized = true
-                        items[i].syncError = "录音被中断，已恢复可读取部分。"
-                    } catch {
-                        items[i].syncError = "中断文件无法自动恢复，保留原文件：\(error.localizedDescription)"
-                    }
-                }
-                try persist(items)
+                try retrySaving()
             }
         } catch { self.error = "录音库恢复失败：\(error.localizedDescription)。已有文件不会被覆盖。" }
     }
 
     func audioURL(_ id: UUID) -> URL { root.appendingPathComponent("\(id.uuidString).caf") }
+
+    // Only call when capture has stopped. Also recovers a finalized audio file whose last
+    // manifest write failed; users need not restart the app after freeing disk space.
+    func retrySaving() throws {
+        guard snapshot != nil else { throw LibraryError.unavailable }
+        var candidate = items
+        for i in candidate.indices where !candidate[i].finalized {
+            do {
+                let file = try AVAudioFile(forReading: audioURL(candidate[i].id))
+                guard file.length > 0 else {
+                    candidate[i].syncError = "文件中没有可读音频，已保留，未加入同步队列。"
+                    continue
+                }
+                candidate[i].metadata.duration = Double(file.length) / file.processingFormat.sampleRate
+                candidate[i].finalized = true
+                candidate[i].syncError = "录音被中断，已恢复可读取部分。"
+            } catch {
+                candidate[i].syncError = "中断文件无法自动恢复，保留原文件：\(error.localizedDescription)"
+            }
+        }
+        try persist(candidate)
+    }
 
     func register(_ metadata: RecordingMetadata) throws {
         guard snapshot != nil else { throw LibraryError.unavailable }
